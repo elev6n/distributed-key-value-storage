@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{dht::DhtNode, helpers::now};
 
-pub(super) fn serialize_value(value: StoredValue) -> anyhow::Result<Vec<u8>> {
-    bincode::serialize(&value).context("Failed to serialize stored value")
+pub(super) fn serialize_value(value: &StoredValue) -> anyhow::Result<Vec<u8>> {
+    bincode::serialize(value).context("Failed to serialize stored value")
 }
 
 pub(super) fn deserialize_value(data: &[u8]) -> anyhow::Result<StoredValue> {

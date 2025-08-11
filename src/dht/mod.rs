@@ -173,7 +173,7 @@ impl DhtNode {
             false,
             Some(self.config.storage.default_ttl),
         );
-        let serialized = serialize_value(stored)?;
+        let serialized = serialize_value(&stored)?;
 
         let closest_peers = self.find_closest_peers_by_key(&key);
 
@@ -202,7 +202,7 @@ impl DhtNode {
         self.metrics.set_known_peers(closest_peers.len() as u64);
 
         let successes = self
-            .replicate_to_peers_find(&mut found_values, key.clone(), closest_peers)
+            .query_peers_for_value(&mut found_values, key.clone(), closest_peers)
             .await;
 
         record_find_attempt(&self.metrics, successes > 0);
@@ -214,6 +214,7 @@ impl DhtNode {
     ///
     /// This is the main request processing entry poing for the DHT node.
     pub async fn handle_rpc(&self, rpc: DhtRpc) -> DhtRpc {
+        self.metrics.inc_rpc_requests();
         match rpc {
             DhtRpc::Ping => DhtRpc::Pong,
             DhtRpc::FindNode(target) => {
@@ -225,8 +226,21 @@ impl DhtNode {
                 DhtRpc::FindValueResponse(value)
             }
             DhtRpc::Store(key, value) => {
-                // self.store(key, value).await.unwrap();
-                self.storage.insert(key, value);
+                self.metrics.inc_store_ops();
+
+                if let Ok(mut stored) = deserialize_value(&value) {
+                    stored.last_node = self.addr;
+                    stored.is_replica = true;
+
+                    if let Ok(value) = serialize_value(&stored) {
+                        self.storage.insert(key, value);
+                        self.metrics.inc_store_success();
+                    } else {
+                        self.metrics.inc_rpc_failures();
+                    }
+                } else {
+                    self.metrics.inc_rpc_failures();
+                }
                 DhtRpc::Pong
             }
             _ => DhtRpc::Pong,
@@ -432,7 +446,7 @@ impl DhtNode {
             match self
                 .send_rpc(
                     peer.addr,
-                    DhtRpc::Store(key.clone(), serialize_value(value_to_store)?),
+                    DhtRpc::Store(key.clone(), serialize_value(&value_to_store)?),
                 )
                 .await
             {

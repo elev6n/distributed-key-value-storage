@@ -1,9 +1,4 @@
-use crate::dht::{
-    DhtNode,
-    peer::PeerInfo,
-    rpc::utils::{send_find_rpc, send_store_rpc},
-    storage::StoredValue,
-};
+use crate::dht::{DhtNode, peer::PeerInfo, rpc::utils::send_store_rpc};
 
 impl DhtNode {
     pub async fn replicate_to_peers_store(
@@ -20,24 +15,6 @@ impl DhtNode {
             }
 
             if send_store_rpc(self, peer.addr, key.clone(), value.clone())
-                .await
-                .is_ok()
-            {
-                successes += 1;
-            }
-        }
-        successes
-    }
-
-    pub async fn replicate_to_peers_find(
-        &self,
-        found_values: &mut Vec<StoredValue>,
-        key: Vec<u8>,
-        peers: Vec<PeerInfo>,
-    ) -> usize {
-        let mut successes = 0;
-        for peer in peers {
-            if send_find_rpc(self, found_values, peer.addr, key.clone())
                 .await
                 .is_ok()
             {
